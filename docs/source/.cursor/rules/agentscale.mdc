@@ -1,0 +1,6 @@
+---
+description: AgentScale project constraints and milestone discipline
+alwaysApply: true
+---
+
+Follow the repository-root `AGENTS.md` and the AgentScale foundation documents. Work only on the milestone explicitly named by the user. Do not start frontend work until authorized. Preserve Git as the source of truth; do not invent a VCS format. Use Git-native object storage and a managed bare mirror for the MVP. Workspace clones must keep their writable Git state separate and may read immutable objects from the shared cache only through a controlled, lease-protected dependency. Never prune or garbage-collect the cache while dependent workspaces exist. Pin workspaces to full commit SHAs. Use argument arrays for subprocess calls; never interpolate user input into shell commands. Validate paths and repository URLs, redact secrets, use timeouts, test failure paths, and never fabricate metrics or benchmark improvements. Before changes, inspect the repository and preserve uncommitted user work. After each task, report changed files, exact tests/commands and outcomes, risks, milestone exit-gate status, and the smallest next task. Do not commit unless explicitly asked.

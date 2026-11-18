@@ -1,0 +1,1591 @@
+openapi: 3.0.3
+info:
+  title: Selene control plane
+  version: 0.0.0-design
+  description: |
+    Design contract for the single-host prototype. Not implemented.
+    Coding has not started. Frontend confirm controls are not enabled by this file.
+    Screen 13 preview paths are not part of this contract.
+    x-cursor-subagent bc-2cc8ce60-3e81-566b-bfd1-089beafbc3b8
+  x-cursor-subagent: bc-2cc8ce60-3e81-566b-bfd1-089beafbc3b8
+servers:
+  - url: http://127.0.0.1:8080
+    description: Loopback only while IAM is deferred. Not a public server.
+tags:
+  - name: health
+  - name: repositories
+  - name: workspaces
+  - name: operations
+  - name: cache
+  - name: datasets
+  - name: benchmarks
+  - name: telemetry
+  - name: node
+paths:
+  /healthz:
+    get:
+      tags: [health]
+      operationId: getHealthz
+      summary: Process liveness. Does not check PostgreSQL.
+      responses:
+        "200":
+          description: Process is running.
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Liveness"
+  /readyz:
+    get:
+      tags: [health]
+      operationId: getReadyz
+      summary: Database and local data directory readiness.
+      responses:
+        "200":
+          description: Required checks passed.
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Readiness"
+        "503":
+          description: A required check failed or was not run.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Readiness"
+  /api/v1/repositories:
+    get:
+      tags: [repositories]
+      operationId: listRepositories
+      summary: Paginated repository registry.
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/CorrelationHeader"
+      responses:
+        "200":
+          description: Page of repositories. Paths and credentials are absent.
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RepositoryPage"
+        "400":
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [repositories]
+      operationId: createRepository
+      summary: Register a public HTTPS remote. Does not fetch.
+      description: |
+        Implements the accepted D22–D44 registration contract. Validation is
+        first-failure-wins in this order: JSON parse/structure, credential keys,
+        unknown keys, field types/provider, name, default branch, remote URL,
+        storage path, DNS, then the atomic database transaction. Only the four
+        exact case-sensitive request keys are accepted. No mirror or directory
+        is created and no Git fetch occurs during registration.
+        DNS uses a child of the request context with a five-second maximum.
+      parameters:
+        - $ref: "#/components/parameters/CorrelationHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RepositoryCreate"
+      responses:
+        "201":
+          description: Row stored as registered. Mirror not populated yet.
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Repository"
+        "400":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/repositories/{repositoryID}:
+    get:
+      tags: [repositories]
+      operationId: getRepository
+      parameters:
+        - $ref: "#/components/parameters/RepositoryID"
+        - $ref: "#/components/parameters/CorrelationHeader"
+      responses:
+        "200":
+          description: One repository.
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Repository"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/repositories/{repositoryID}/sync:
+    post:
+      tags: [repositories]
+      operationId: syncRepository
+      summary: One mirror-refresh. Creates the bare mirror if needed, then fetches.
+      description: |
+        Also the operation behind a "warm cache" label. There is no second route.
+        Returns 202 and an operation to poll. A join of an in-flight refresh returns
+        that same operation.
+      parameters:
+        - $ref: "#/components/parameters/RepositoryID"
+        - $ref: "#/components/parameters/CorrelationHeader"
+      responses:
+        "202":
+          description: Refresh accepted or already running.
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptedOperation"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/repositories/{repositoryID}/cache:
+    get:
+      tags: [cache]
+      operationId: getRepositoryCache
+      parameters:
+        - $ref: "#/components/parameters/RepositoryID"
+        - $ref: "#/components/parameters/CorrelationHeader"
+      responses:
+        "200":
+          description: Cache entry. Counts are null until measured. No eviction total.
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CacheEntry"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/repositories/{repositoryID}/refs:
+    get:
+      tags: [repositories]
+      operationId: listRepositoryRefs
+      parameters:
+        - $ref: "#/components/parameters/RepositoryID"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/CorrelationHeader"
+      responses:
+        "200":
+          description: Refs read from the mirror. Empty page if the mirror has never fetched.
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RefPage"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/repositories/{repositoryID}/commits:
+    get:
+      tags: [repositories]
+      operationId: listRepositoryCommits
+      parameters:
+        - $ref: "#/components/parameters/RepositoryID"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/CorrelationHeader"
+      responses:
+        "200":
+          description: Commit records from the mirror. Not a graph layout.
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommitPage"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/workspaces:
+    get:
+      tags: [workspaces]
+      operationId: listWorkspaces
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/CorrelationHeader"
+        - name: repository_id
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Page of workspaces.
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspacePage"
+        "400":
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [workspaces]
+      operationId: createWorkspace
+      summary: Provision at a full commit SHA.
+      parameters:
+        - $ref: "#/components/parameters/CorrelationHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkspaceCreate"
+      responses:
+        "202":
+          description: Workspace row is durable. Provision continues on the operation.
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptedOperation"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/workspaces/{workspaceID}:
+    get:
+      tags: [workspaces]
+      operationId: getWorkspace
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceID"
+        - $ref: "#/components/parameters/CorrelationHeader"
+      responses:
+        "200":
+          description: One workspace. Internal path is omitted. Tree counts are null if Git was not read.
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workspace"
+        "404":
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [workspaces]
+      operationId: destroyWorkspace
+      summary: Destroy the workspace directory and release its lease. Does not delete mirror objects.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceID"
+        - $ref: "#/components/parameters/CorrelationHeader"
+      responses:
+        "202":
+          description: Destroy accepted.
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptedOperation"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/operations/{operationID}:
+    get:
+      tags: [operations]
+      operationId: getOperation
+      summary: Poll a 202 operation.
+      parameters:
+        - $ref: "#/components/parameters/OperationID"
+        - $ref: "#/components/parameters/CorrelationHeader"
+      responses:
+        "200":
+          description: Current operation. Terminal statuses are succeeded and failed.
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Operation"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/cache:
+    get:
+      tags: [cache]
+      operationId: getCacheRollup
+      summary: One node-local cache. No invented eviction count.
+      parameters:
+        - $ref: "#/components/parameters/CorrelationHeader"
+      responses:
+        "200":
+          description: Rollup of cache entries plus capacity if configured.
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CacheRollup"
+  /api/v1/node:
+    get:
+      tags: [node]
+      operationId: getNode
+      summary: Read-only view of node-a.
+      parameters:
+        - $ref: "#/components/parameters/CorrelationHeader"
+      responses:
+        "200":
+          description: Single host. Management actions are not in this contract.
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Node"
+  /api/v1/datasets:
+    get:
+      tags: [datasets]
+      operationId: listDatasets
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/CorrelationHeader"
+      responses:
+        "200":
+          description: Registry of pinned datasets. Pins are null until resolved.
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatasetPage"
+    post:
+      tags: [datasets]
+      operationId: createDataset
+      summary: Record a dataset pin or synthetic generator inputs. Does not copy frontend fixtures.
+      parameters:
+        - $ref: "#/components/parameters/CorrelationHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DatasetCreate"
+      responses:
+        "201":
+          description: Dataset row stored.
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Dataset"
+        "400":
+          $ref: "#/components/responses/Error"
+  /api/v1/datasets/{datasetID}:
+    get:
+      tags: [datasets]
+      operationId: getDataset
+      parameters:
+        - $ref: "#/components/parameters/DatasetID"
+        - $ref: "#/components/parameters/CorrelationHeader"
+      responses:
+        "200":
+          description: One dataset.
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Dataset"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/benchmark-configurations:
+    get:
+      tags: [benchmarks]
+      operationId: listBenchmarkConfigurations
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/CorrelationHeader"
+      responses:
+        "200":
+          description: Stored experimental configurations, including the research protocol and the demonstration preset.
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BenchmarkConfigurationPage"
+    post:
+      tags: [benchmarks]
+      operationId: createBenchmarkConfiguration
+      summary: Store one experimental configuration. Does not start a run.
+      parameters:
+        - $ref: "#/components/parameters/CorrelationHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BenchmarkConfiguration"
+      responses:
+        "201":
+          description: Configuration stored.
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BenchmarkConfiguration"
+        "400":
+          $ref: "#/components/responses/Error"
+  /api/v1/benchmark-configurations/{configurationID}:
+    get:
+      tags: [benchmarks]
+      operationId: getBenchmarkConfiguration
+      parameters:
+        - name: configurationID
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/CorrelationHeader"
+      responses:
+        "200":
+          description: One configuration.
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BenchmarkConfiguration"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/benchmarks:
+    post:
+      tags: [benchmarks]
+      operationId: createBenchmark
+      summary: Create a run for one stored configuration. Does not declare a winner.
+      parameters:
+        - $ref: "#/components/parameters/CorrelationHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BenchmarkCreate"
+      responses:
+        "202":
+          description: Run accepted. Demonstration preset is stored as such and is not a research result.
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptedOperation"
+        "400":
+          $ref: "#/components/responses/Error"
+  /api/v1/benchmarks/{runID}:
+    get:
+      tags: [benchmarks]
+      operationId: getBenchmark
+      parameters:
+        - $ref: "#/components/parameters/RunID"
+        - $ref: "#/components/parameters/CorrelationHeader"
+      responses:
+        "200":
+          description: Run metadata, configuration, and summary fields that are null when unmeasured.
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BenchmarkRun"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/benchmarks/{runID}/trials:
+    get:
+      tags: [benchmarks]
+      operationId: listBenchmarkTrials
+      parameters:
+        - $ref: "#/components/parameters/RunID"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/CorrelationHeader"
+      responses:
+        "200":
+          description: Every trial, including failures. Baseline cache hit fields are not_applicable.
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrialPage"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/events:
+    get:
+      tags: [telemetry]
+      operationId: listEvents
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/CorrelationHeader"
+        - name: repository_id
+          in: query
+          schema:
+            type: string
+        - name: workspace_id
+          in: query
+          schema:
+            type: string
+        - name: correlation_id
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Append-only operation events.
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventPage"
+        "400":
+          $ref: "#/components/responses/Error"
+  /api/v1/logs:
+    get:
+      tags: [telemetry]
+      operationId: listLogs
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/CorrelationHeader"
+        - name: severity
+          in: query
+          schema:
+            type: string
+            enum: [debug, info, warning, error]
+        - name: service
+          in: query
+          schema:
+            type: string
+        - name: correlation_id
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Redacted log lines. Not alert evaluations.
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogPage"
+  /api/v1/traces/{correlationID}:
+    get:
+      tags: [telemetry]
+      operationId: getTrace
+      parameters:
+        - name: correlationID
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/CorrelationHeader"
+      responses:
+        "200":
+          description: Events and logs for one correlation id, oldest first. Missing stages are omitted.
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Trace"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/config:
+    get:
+      tags: [node]
+      operationId: getConfig
+      summary: Effective process configuration. Not a writable settings document.
+      parameters:
+        - $ref: "#/components/parameters/CorrelationHeader"
+      responses:
+        "200":
+          description: Bind address, node id, and check results. No filesystem paths and no secrets.
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EffectiveConfig"
+  /api/v1/security:
+    get:
+      tags: [node]
+      operationId: getSecurity
+      summary: Enforcement is not implemented.
+      parameters:
+        - $ref: "#/components/parameters/CorrelationHeader"
+      responses:
+        "200":
+          description: Fixed not-enforced document. No users and no keys.
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SecurityStatus"
+components:
+  headers:
+    CorrelationID:
+      description: Server correlation id for this response. Echoes X-Correlation-ID when the client sent one.
+      schema:
+        type: string
+  parameters:
+    Page:
+      name: page
+      in: query
+      description: 1-based page index.
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: page_size
+      in: query
+      description: Page size. Values above 100 are rejected.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    CorrelationHeader:
+      name: X-Correlation-ID
+      in: header
+      required: false
+      schema:
+        type: string
+        maxLength: 128
+    RepositoryID:
+      name: repositoryID
+      in: path
+      required: true
+      schema:
+        type: string
+    WorkspaceID:
+      name: workspaceID
+      in: path
+      required: true
+      schema:
+        type: string
+    OperationID:
+      name: operationID
+      in: path
+      required: true
+      schema:
+        type: string
+    DatasetID:
+      name: datasetID
+      in: path
+      required: true
+      schema:
+        type: string
+    RunID:
+      name: runID
+      in: path
+      required: true
+      schema:
+        type: string
+  responses:
+    Error:
+      description: Stable machine-readable error. No secrets and no host paths.
+      headers:
+        X-Correlation-ID:
+          $ref: "#/components/headers/CorrelationID"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+  schemas:
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          $ref: "#/components/schemas/ErrorBody"
+    ErrorBody:
+      type: object
+      required: [code, message, correlation_id]
+      properties:
+        code:
+          type: string
+          description: |
+            Stable codes include invalid_request_body, invalid_provider, unknown_field,
+            invalid_remote_url, unsupported_scheme, credentials_not_accepted,
+            remote_address_rejected, remote_unresolvable, dns_resolution_failed,
+            redirect_limit_exceeded, invalid_repository_name, invalid_default_branch,
+            repository_already_registered, storage_path_unavailable, invalid_commit_sha,
+            not_found, cache_not_ready, lease_held, sync_in_progress, upstream_unavailable,
+            disk_full, git_timeout, not_persisted, path_rejected, head_mismatch,
+            interrupted, page_out_of_range.
+        message:
+          type: string
+        correlation_id:
+          type: string
+    PageMeta:
+      type: object
+      required: [page, page_size, total]
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total:
+          type: integer
+    Freshness:
+      type: string
+      enum: [live, recent, historical, unavailable]
+    Liveness:
+      type: object
+      required: [status, correlation_id]
+      properties:
+        status:
+          type: string
+          enum: [up]
+        correlation_id:
+          type: string
+    Readiness:
+      type: object
+      required: [status, correlation_id, checks]
+      properties:
+        status:
+          type: string
+          enum: [ready, not_ready]
+        correlation_id:
+          type: string
+        checks:
+          type: array
+          items:
+            $ref: "#/components/schemas/ComponentHealth"
+    ComponentHealth:
+      type: object
+      required: [name, status]
+      properties:
+        name:
+          type: string
+          enum: [control_plane, cache_manager, cache_node, http_api, workspace_manager, database]
+        status:
+          type: string
+          enum: [up, down, unknown]
+        checked_at:
+          type: string
+          format: date-time
+          nullable: true
+    RepositoryStatus:
+      type: string
+      enum: [registered, syncing, ready, degraded, error]
+    CacheState:
+      type: string
+      enum: [empty, warming, ready, degraded, error]
+    WorkspaceStatus:
+      type: string
+      enum: [requested, provisioning, ready, failed, stopping, stopped, destroying, destroyed]
+    Provider:
+      type: string
+      enum: [github, gitlab, self_hosted, other]
+    Repository:
+      type: object
+      required: [id, name, remote_url, provider, default_branch, status, correlation_id]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        remote_url:
+          type: string
+          description: Sanitized https URL. No userinfo.
+        provider:
+          $ref: "#/components/schemas/Provider"
+        default_branch:
+          type: string
+        status:
+          $ref: "#/components/schemas/RepositoryStatus"
+        cached_commit:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        last_synced_at:
+          type: string
+          format: date-time
+          nullable: true
+        correlation_id:
+          type: string
+    RepositoryCreate:
+      type: object
+      required: [name, remote_url, default_branch]
+      properties:
+        name:
+          type: string
+        remote_url:
+          type: string
+        provider:
+          $ref: "#/components/schemas/Provider"
+        default_branch:
+          type: string
+      additionalProperties: false
+      description: |
+        Only exact case-sensitive keys name, remote_url, provider, default_branch
+        are accepted. Client-supplied id and all other keys are rejected. Credential
+        keys access_token, credential, and authorization are rejected before unknown
+        keys. Duplicate JSON properties are invalid_request_body. Explicit provider
+        must be a non-null string in the Provider enum.
+    RepositoryPage:
+      allOf:
+        - $ref: "#/components/schemas/PageMeta"
+        - type: object
+          required: [data, correlation_id]
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/Repository"
+            correlation_id:
+              type: string
+    CacheEntry:
+      type: object
+      required: [repository_id, state, lease_count, freshness, correlation_id]
+      properties:
+        repository_id:
+          type: string
+        state:
+          $ref: "#/components/schemas/CacheState"
+        object_format:
+          type: string
+          nullable: true
+        object_count:
+          type: integer
+          nullable: true
+        disk_bytes:
+          type: integer
+          format: int64
+          nullable: true
+        lease_count:
+          type: integer
+          minimum: 0
+        last_successful_sync_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_error_code:
+          type: string
+          nullable: true
+        freshness:
+          $ref: "#/components/schemas/Freshness"
+        correlation_id:
+          type: string
+    CacheRollup:
+      type: object
+      required: [node_id, freshness, correlation_id]
+      properties:
+        node_id:
+          type: string
+          enum: [node-a]
+        capacity_bytes:
+          type: integer
+          format: int64
+          nullable: true
+        used_bytes:
+          type: integer
+          format: int64
+          nullable: true
+        object_count:
+          type: integer
+          nullable: true
+        hit_count:
+          type: integer
+          nullable: true
+        miss_count:
+          type: integer
+          nullable: true
+        measurement_source:
+          type: string
+          enum: [git_fetch_output, rev_list_and_network, unavailable]
+        freshness:
+          $ref: "#/components/schemas/Freshness"
+        correlation_id:
+          type: string
+      description: eviction_count is intentionally absent.
+    RefEntry:
+      type: object
+      required: [name, commit_sha]
+      properties:
+        name:
+          type: string
+        commit_sha:
+          type: string
+    RefPage:
+      allOf:
+        - $ref: "#/components/schemas/PageMeta"
+        - type: object
+          required: [data, correlation_id]
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/RefEntry"
+            correlation_id:
+              type: string
+    CommitEntry:
+      type: object
+      required: [commit_sha]
+      properties:
+        commit_sha:
+          type: string
+        author_name:
+          type: string
+          nullable: true
+        authored_at:
+          type: string
+          format: date-time
+          nullable: true
+        message:
+          type: string
+          nullable: true
+    CommitPage:
+      allOf:
+        - $ref: "#/components/schemas/PageMeta"
+        - type: object
+          required: [data, correlation_id]
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/CommitEntry"
+            correlation_id:
+              type: string
+    Workspace:
+      type: object
+      required: [id, repository_id, base_commit, status, node_id, correlation_id]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        repository_id:
+          type: string
+        base_commit:
+          type: string
+        branch_name:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/WorkspaceStatus"
+        agent_label:
+          type: string
+          nullable: true
+          description: Caller name only. Not a running agent.
+        node_id:
+          type: string
+        cache_lease_id:
+          type: string
+          nullable: true
+        head_sha:
+          type: string
+          nullable: true
+        changed_path_count:
+          type: integer
+          nullable: true
+        uncommitted_path_count:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        ready_at:
+          type: string
+          format: date-time
+          nullable: true
+        destroyed_at:
+          type: string
+          format: date-time
+          nullable: true
+        error_code:
+          type: string
+          nullable: true
+        error_message:
+          type: string
+          nullable: true
+        freshness:
+          $ref: "#/components/schemas/Freshness"
+        correlation_id:
+          type: string
+    WorkspaceCreate:
+      type: object
+      required: [repository_id, commit_sha, name]
+      properties:
+        repository_id:
+          type: string
+        commit_sha:
+          type: string
+          description: Full SHA-1 (40 hex) or SHA-256 (64 hex). Not a branch name.
+        name:
+          type: string
+        agent_label:
+          type: string
+          maxLength: 128
+    WorkspacePage:
+      allOf:
+        - $ref: "#/components/schemas/PageMeta"
+        - type: object
+          required: [data, correlation_id]
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/Workspace"
+            correlation_id:
+              type: string
+    OperationStatus:
+      type: string
+      enum: [accepted, running, succeeded, failed, needs_reconciliation]
+    OperationType:
+      type: string
+      enum: [repository_sync, workspace_provision, workspace_destroy, benchmark_run]
+    Operation:
+      type: object
+      required: [id, type, status, correlation_id]
+      properties:
+        id:
+          type: string
+        type:
+          $ref: "#/components/schemas/OperationType"
+        status:
+          $ref: "#/components/schemas/OperationStatus"
+        repository_id:
+          type: string
+          nullable: true
+        workspace_id:
+          type: string
+          nullable: true
+        benchmark_run_id:
+          type: string
+          nullable: true
+        error_code:
+          type: string
+          nullable: true
+        error_message:
+          type: string
+          nullable: true
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        finished_at:
+          type: string
+          format: date-time
+          nullable: true
+        correlation_id:
+          type: string
+    AcceptedOperation:
+      type: object
+      required: [operation_id, status, correlation_id]
+      properties:
+        operation_id:
+          type: string
+        workspace_id:
+          type: string
+          nullable: true
+        benchmark_run_id:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/OperationStatus"
+        correlation_id:
+          type: string
+    DatasetKind:
+      type: string
+      enum: [public_repository, synthetic]
+    Dataset:
+      type: object
+      required: [id, kind, correlation_id]
+      properties:
+        id:
+          type: string
+        kind:
+          $ref: "#/components/schemas/DatasetKind"
+        repository_id:
+          type: string
+          nullable: true
+          description: Set for public repositories. Null for dataset_synthetic_overlap.
+        name:
+          type: string
+        commit_sha:
+          type: string
+          nullable: true
+        generator:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: File count, size, history depth, binary/text ratio, overlap, and seed for synthetic datasets.
+        correlation_id:
+          type: string
+    DatasetCreate:
+      type: object
+      required: [id, kind, name]
+      properties:
+        id:
+          type: string
+        kind:
+          $ref: "#/components/schemas/DatasetKind"
+        name:
+          type: string
+        repository_id:
+          type: string
+          nullable: true
+        commit_sha:
+          type: string
+          nullable: true
+        generator:
+          type: object
+          nullable: true
+          additionalProperties: true
+    DatasetPage:
+      allOf:
+        - $ref: "#/components/schemas/PageMeta"
+        - type: object
+          required: [data, correlation_id]
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/Dataset"
+            correlation_id:
+              type: string
+    Arm:
+      type: string
+      enum: [standard_git, optimized_git, selene]
+    BenchmarkPreset:
+      type: string
+      enum: [research, demonstration]
+    BenchmarkCreate:
+      type: object
+      required: [configuration_id, dataset_id, commit_sha]
+      properties:
+        configuration_id:
+          type: string
+        dataset_id:
+          type: string
+        commit_sha:
+          type: string
+        name:
+          type: string
+    BenchmarkConfiguration:
+      type: object
+      required: [id, preset, arms, concurrencies, cache_states, repetitions, scope, dataset_id]
+      properties:
+        id:
+          type: string
+        preset:
+          $ref: "#/components/schemas/BenchmarkPreset"
+        protocol:
+          type: string
+          nullable: true
+          description: foundation-07 for research. Null for the demonstration preset.
+        arms:
+          type: array
+          items:
+            $ref: "#/components/schemas/Arm"
+        concurrencies:
+          type: array
+          items:
+            type: integer
+        cache_states:
+          type: array
+          items:
+            type: string
+            enum: [cold, warm]
+        repetitions:
+          type: integer
+          minimum: 1
+        scope:
+          type: string
+          enum: [full, sparse]
+        dataset_id:
+          type: string
+        commit_sha:
+          type: string
+          nullable: true
+        seed:
+          type: integer
+          nullable: true
+        optimized_git_flags:
+          type: array
+          items:
+            type: string
+        correlation_id:
+          type: string
+    BenchmarkConfigurationPage:
+      allOf:
+        - $ref: "#/components/schemas/PageMeta"
+        - type: object
+          required: [data, correlation_id]
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/BenchmarkConfiguration"
+            correlation_id:
+              type: string
+    BenchmarkRun:
+      type: object
+      required: [id, status, preset, commit_sha, correlation_id]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+          enum: [accepted, running, succeeded, failed]
+        preset:
+          $ref: "#/components/schemas/BenchmarkPreset"
+        configuration:
+          $ref: "#/components/schemas/BenchmarkConfiguration"
+        dataset_id:
+          type: string
+        commit_sha:
+          type: string
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        failure_count:
+          type: integer
+          nullable: true
+        summary:
+          type: object
+          nullable: true
+          description: Aggregates from completed trials only. Unmeasured fields are null. No speedup or winner.
+          additionalProperties: true
+        correlation_id:
+          type: string
+    CacheHitField:
+      type: object
+      required: [state]
+      properties:
+        state:
+          type: string
+          enum: [measured, not_applicable, unavailable]
+        hits:
+          type: integer
+          nullable: true
+        misses:
+          type: integer
+          nullable: true
+    Trial:
+      type: object
+      required: [id, run_id, trial_index, arm, status]
+      properties:
+        id:
+          type: string
+        run_id:
+          type: string
+        trial_index:
+          type: integer
+        arm:
+          $ref: "#/components/schemas/Arm"
+        cache_state:
+          type: string
+          enum: [cold, warm]
+        concurrency:
+          type: integer
+        status:
+          type: string
+          enum: [succeeded, failed]
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        duration_ms:
+          type: integer
+          nullable: true
+        workspace_count:
+          type: integer
+          nullable: true
+        success_count:
+          type: integer
+          nullable: true
+        failure_count:
+          type: integer
+          nullable: true
+        upstream_bytes_sent:
+          type: integer
+          format: int64
+          nullable: true
+        upstream_bytes_received:
+          type: integer
+          format: int64
+          nullable: true
+        cpu_percent:
+          type: number
+          nullable: true
+        memory_bytes:
+          type: integer
+          format: int64
+          nullable: true
+        block_read_bytes:
+          type: integer
+          format: int64
+          nullable: true
+        block_write_bytes:
+          type: integer
+          format: int64
+          nullable: true
+        cache:
+          $ref: "#/components/schemas/CacheHitField"
+        measurement_source:
+          type: string
+          enum: [docker_network, worker_clock, git_command, unavailable]
+        error_code:
+          type: string
+          nullable: true
+    TrialPage:
+      allOf:
+        - $ref: "#/components/schemas/PageMeta"
+        - type: object
+          required: [data, correlation_id]
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/Trial"
+            correlation_id:
+              type: string
+    OperationEvent:
+      type: object
+      required: [id, correlation_id, event_type, occurred_at]
+      properties:
+        id:
+          type: string
+        correlation_id:
+          type: string
+        repository_id:
+          type: string
+          nullable: true
+        workspace_id:
+          type: string
+          nullable: true
+        event_type:
+          type: string
+          enum:
+            - repository_registered
+            - cache_warm_started
+            - cache_warm_completed
+            - cache_warm_failed
+            - workspace_requested
+            - workspace_provision_started
+            - workspace_provision_completed
+            - workspace_provision_failed
+            - workspace_destroyed
+            - cache_lease_acquired
+            - cache_lease_released
+        occurred_at:
+          type: string
+          format: date-time
+        duration_ms:
+          type: integer
+          nullable: true
+        attributes:
+          type: object
+          additionalProperties: true
+    EventPage:
+      allOf:
+        - $ref: "#/components/schemas/PageMeta"
+        - type: object
+          required: [data, correlation_id]
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/OperationEvent"
+            correlation_id:
+              type: string
+    LogLine:
+      type: object
+      required: [occurred_at, service, severity, message, correlation_id]
+      properties:
+        occurred_at:
+          type: string
+          format: date-time
+        service:
+          type: string
+        severity:
+          type: string
+          enum: [debug, info, warning, error]
+        correlation_id:
+          type: string
+        repository_id:
+          type: string
+          nullable: true
+        workspace_id:
+          type: string
+          nullable: true
+        message:
+          type: string
+    LogPage:
+      allOf:
+        - $ref: "#/components/schemas/PageMeta"
+        - type: object
+          required: [data, correlation_id]
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/LogLine"
+            correlation_id:
+              type: string
+    Trace:
+      type: object
+      required: [correlation_id, events, logs]
+      properties:
+        correlation_id:
+          type: string
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/OperationEvent"
+        logs:
+          type: array
+          items:
+            $ref: "#/components/schemas/LogLine"
+    Node:
+      type: object
+      required: [id, read_only, correlation_id, components]
+      properties:
+        id:
+          type: string
+          enum: [node-a]
+        hostname:
+          type: string
+          nullable: true
+        region_label:
+          type: string
+          nullable: true
+        read_only:
+          type: boolean
+          enum: [true]
+        heartbeat_at:
+          type: string
+          format: date-time
+          nullable: true
+        components:
+          type: array
+          items:
+            $ref: "#/components/schemas/ComponentHealth"
+        correlation_id:
+          type: string
+    EffectiveConfig:
+      type: object
+      required: [bind_address, node_id, eviction, correlation_id]
+      properties:
+        bind_address:
+          type: string
+          example: 127.0.0.1:8080
+        node_id:
+          type: string
+          enum: [node-a]
+        git_version:
+          type: string
+          nullable: true
+        database:
+          type: string
+          enum: [up, down, unknown]
+        cache_capacity_bytes:
+          type: integer
+          format: int64
+          nullable: true
+        eviction:
+          type: string
+          enum: [deferred]
+        correlation_id:
+          type: string
+    SecurityStatus:
+      type: object
+      required: [enforcement, iam, api_keys, enterprise_credentials, email, webhooks, correlation_id]
+      properties:
+        enforcement:
+          type: string
+          enum: [not_enforced]
+        iam:
+          type: string
+          enum: [deferred]
+        api_keys:
+          type: string
+          enum: [deferred]
+        enterprise_credentials:
+          type: string
+          enum: [deferred]
+        email:
+          type: string
+          enum: [deferred]
+        webhooks:
+          type: string
+          enum: [deferred]
+        correlation_id:
+          type: string
