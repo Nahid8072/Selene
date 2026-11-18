@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "sakaniui": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@sakaniui/mcp"]
+    },
+    "heroui-react": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@heroui/react-mcp@latest"]
+    }
+  }
+}
