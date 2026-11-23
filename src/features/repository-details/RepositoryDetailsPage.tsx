@@ -57,7 +57,11 @@ function RepositoryHeader({ detail }: { detail: RepositoryDetailView }) {
   return (
     <header className="panel">
       <nav className="crumb" aria-label="Breadcrumb">
+<<<<<<< HEAD
         <Link to="/">Fleet</Link>
+=======
+        <Link to="/overview">Fleet</Link>
+>>>>>>> landing-page
         <span aria-hidden="true">/</span>
         <Link to="/repositories">Repositories</Link>
         <span aria-hidden="true">/</span>
