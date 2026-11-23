@@ -36,7 +36,7 @@ type SidebarNavProps = {
 export function SidebarNav({ onNavigate, showClose = false, collapsed = false, onToggleCollapse }: SidebarNavProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  const overviewActive = location.pathname === "/overview";
+  const overviewActive = location.pathname === "/";
   const repositoriesActive = location.pathname.startsWith("/repositories");
   const workspacesActive = location.pathname === "/workspaces" || location.pathname.startsWith("/workspaces/");
   const workloadsActive = location.pathname === "/workloads" || location.pathname.startsWith("/workloads/");
@@ -78,7 +78,7 @@ export function SidebarNav({ onNavigate, showClose = false, collapsed = false, o
           active={overviewActive}
           collapsed={collapsed}
           onClick={() => {
-            navigate("/overview");
+            navigate("/");
             onNavigate?.();
           }}
         />

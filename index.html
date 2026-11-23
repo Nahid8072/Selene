@@ -12,67 +12,12 @@
       })();
     </script>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Selene — Open-Source Infrastructure for AI Coding Agents</title>
-    <meta
-      name="description"
-      content="Discover Selene, an open-source, self-hostable, Git-compatible infrastructure layer for shared repository caching and isolated workspaces for concurrent AI coding agents."
-    />
-    <meta name="theme-color" content="#08090b" />
-    <meta name="application-name" content="Selene" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="Selene" />
-    <meta property="og:title" content="Selene — Open-Source Infrastructure for AI Coding Agents" />
-    <meta
-      property="og:description"
-      content="Open-source, self-hostable, Git-compatible infrastructure for shared repository caching and isolated workspaces for concurrent AI coding agents."
-    />
-    <meta property="og:image" content="/og-image.png" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Selene: shared infrastructure for concurrent AI coding agents." />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Selene — Open-Source Infrastructure for AI Coding Agents" />
-    <meta
-      name="twitter:description"
-      content="Open-source, self-hostable, Git-compatible infrastructure for shared repository caching and isolated workspaces for concurrent AI coding agents."
-    />
-    <meta name="twitter:image" content="/og-image.png" />
-
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@graph": [
-          {
-            "@type": "SoftwareSourceCode",
-            "name": "Selene",
-            "description": "Open-source, self-hostable, Git-compatible infrastructure layer for efficient repository access, shared object caching, and isolated workspace provisioning for concurrent AI coding agents.",
-            "codeRepository": "https://github.com/Nahid8072/Selene",
-            "creativeWorkStatus": "In development",
-            "author": { "@id": "#organization" }
-          },
-          {
-            "@type": "Organization",
-            "@id": "#organization",
-            "name": "Schrodringers Lab",
-            "founder": [
-              { "@type": "Person", "name": "Fardin Hasan Siam" },
-              { "@type": "Person", "name": "Nahid Hasan Ratul" }
-            ]
-          }
-        ]
-      }
-    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Selene</title>
   </head>
   <body>
     <div id="root"></div>
-    <script>
-      // index.html carries the prerendered landing page. Clear it on other routes before first paint.
-      if (location.pathname !== "/") document.getElementById("root").textContent = "";
-    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

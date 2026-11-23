@@ -13,7 +13,7 @@ export interface SearchHit {
 }
 
 const pages: SearchHit[] = [
-  { id: "page-overview", category: "Pages", label: "Overview", description: "Fleet sample dashboard", href: "/overview" },
+  { id: "page-overview", category: "Pages", label: "Overview", description: "Fleet sample dashboard", href: "/" },
   { id: "page-repos", category: "Pages", label: "Repositories", description: "Registered Git sources", href: "/repositories" },
   { id: "page-workspaces", category: "Pages", label: "Agent Workspaces", description: "Isolated workspace samples", href: "/workspaces" },
   { id: "page-workloads", category: "Pages", label: "Workloads", description: "Sample job groups", href: "/workloads" },
