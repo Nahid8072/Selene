@@ -1,11 +1,4 @@
 import react from '@vitejs/plugin-react'
-<<<<<<< HEAD
-import { defineConfig } from 'vite'
-
-// https://vite.dev/config/
-export default defineConfig({
-  plugins: [react()],
-=======
 import { defineConfig, loadEnv, type Plugin } from 'vite'
 
 /**
@@ -50,5 +43,4 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react(), seo(env.SITE_URL || undefined)],
   }
->>>>>>> landing-page
 })

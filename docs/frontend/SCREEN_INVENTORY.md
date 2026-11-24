@@ -10,11 +10,7 @@ Status values: **Implemented**, **Partial** (a screen exists but does not yet ma
 | --- | --- |
 | Area | Overview |
 | Priority in spec | MVP, highest |
-<<<<<<< HEAD
-| Route | `/` |
-=======
 | Route | `/overview` |
->>>>>>> landing-page
 | Feature folder | `src/features/overview` |
 | Status | Partial |
 
