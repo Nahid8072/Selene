@@ -1,5 +1,4 @@
 <!doctype html>
-<<<<<<< HEAD
 <html lang="en" data-theme="dark">
   <head>
     <script>
@@ -16,84 +15,6 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Selene</title>
-=======
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <script>
-      // Entrance and scroll motion only run when scripts run and the visitor has not asked for reduced motion.
-      // Without this class every element renders in its final, visible state.
-      (function () {
-        var root = document.documentElement;
-        if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-        // `?motion=off` renders the settled page, for screenshots and link-preview tools.
-        if (/[?&]motion=off\b/.test(location.search)) return;
-        root.classList.add("motion");
-        // Safety net: if the app bundle never starts, reveal everything rather than leave it hidden.
-        setTimeout(function () {
-          if (!root.classList.contains("app-ready")) root.classList.remove("motion");
-        }, 4000);
-      })();
-    </script>
-    <title>Selene — Open-source infrastructure for concurrent AI coding agents</title>
-    <meta
-      name="description"
-      content="Selene is an open-source, self-hostable, Git-compatible infrastructure layer for repository access, shared Git object caching, and isolated workspaces for AI coding agents working in parallel."
-    />
-    <meta name="theme-color" content="#09090a" />
-    <meta name="color-scheme" content="dark" />
-    <meta name="application-name" content="Selene" />
-    <meta name="author" content="Schrodringers Lab" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="Selene" />
-    <meta property="og:title" content="Selene — Infrastructure for coding agents working in parallel" />
-    <meta
-      property="og:description"
-      content="Open-source, self-hostable, Git-compatible infrastructure for shared object caching and isolated workspaces for concurrent AI coding agents."
-    />
-    <meta property="og:image" content="/og-image.png" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Selene: shared repository infrastructure for concurrent AI coding agents." />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Selene — Infrastructure for coding agents working in parallel" />
-    <meta
-      name="twitter:description"
-      content="Open-source, self-hostable, Git-compatible infrastructure for shared object caching and isolated workspaces for concurrent AI coding agents."
-    />
-    <meta name="twitter:image" content="/og-image.png" />
-
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@graph": [
-          {
-            "@type": "SoftwareSourceCode",
-            "name": "Selene",
-            "description": "Open-source, self-hostable, Git-compatible infrastructure layer for efficient repository access, shared object caching, and isolated workspace provisioning for concurrent AI coding agents.",
-            "codeRepository": "https://github.com/Nahid8072/Selene",
-            "programmingLanguage": "TypeScript",
-            "creativeWorkStatus": "In development",
-            "keywords": "AI coding agents, Git-compatible infrastructure, Git object caching, agent workspaces, self-hosted developer infrastructure",
-            "author": { "@id": "#organization" }
-          },
-          {
-            "@type": "Organization",
-            "@id": "#organization",
-            "name": "Schrodringers Lab",
-            "founder": [
-              { "@type": "Person", "name": "Fardin Hasan Siam" },
-              { "@type": "Person", "name": "Nahid Hasan Ratul" }
-            ]
-          }
-        ]
-      }
-    </script>
->>>>>>> landing-page
   </head>
   <body>
     <div id="root"></div>

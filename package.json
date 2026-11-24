@@ -5,16 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-<<<<<<< HEAD
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview"
-=======
-    "build": "tsc -b && vite build && node scripts/prerender.mjs",
-    "lint": "oxlint",
-    "preview": "vite preview",
-    "typecheck": "tsc -b"
->>>>>>> landing-page
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",
